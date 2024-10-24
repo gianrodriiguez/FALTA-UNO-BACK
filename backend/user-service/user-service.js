@@ -17,18 +17,29 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 
 // Define a simple schema for players
 const PlayerSchema = new mongoose.Schema({
-    name: String,
-    email: String
+  name: {type: String, required: true},
+  email: { type: String, required: true, unique: true}
 });
 
 const Player = mongoose.model('Player', PlayerSchema);
- 
+
 // Register player
 app.post('/register', async (req, res) => {
-    const { name, email } = req.body;
-    const newPlayer = new Player({ name, email });
-    await newPlayer.save();
-    res.status(201).json(newPlayer);
+  const { name, email } = req.body;
+
+  try {
+      // Create a new player
+      const newPlayer = new Player({ name, email });
+      await newPlayer.save();
+
+      res.status(201).json(newPlayer);
+  } catch (error) {
+      if (error.code === 11000) {  // Duplicate key error code
+          res.status(400).json({ error: 'Player with this email already exists' });
+      } else {
+          res.status(500).json({ error: 'Something went wrong' });
+      }
+  }
 });
 
 // Login player

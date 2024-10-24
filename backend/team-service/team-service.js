@@ -38,17 +38,6 @@ app.get('/teams', async (req, res) => {
     }
   });  
 
-// app.get('/teams/:playerId', async (req, res) => {
-//   const { playerId } = req.params;
-//   try {
-//     const teams = await Team.find({ players: playerId });  // Find teams that contain the player's ID
-//     res.json(teams);
-//   } catch (error) {
-//     console.error('Error fetching teams:', error);
-//     res.status(500).send('Error fetching teams');
-//   }
-// });
-
 app.get('/teams/player/:playerId', async (req, res) => {
   try {
     const teams = await Team.find({ players: req.params.playerId });  // Assuming teams have player IDs
