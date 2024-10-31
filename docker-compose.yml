@@ -20,7 +20,9 @@ services:
       - mongo
 
   team-service:
-    build: ./backend/team-service
+    build: ./backend/team-service  # Removed the trailing backslash here
+    # volumes:
+    #   - ./models:/app/models  # Mounts local 'models' folder to container's '/app/models'
     ports:
       - "3002:3002"
     environment:
