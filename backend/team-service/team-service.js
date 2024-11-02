@@ -11,10 +11,17 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.log(err));
 
-// Define Team schema directly in this file
+// Define the Player schema directly within this file
+const PlayerSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true }
+});
+const Player = mongoose.model('Player', PlayerSchema);
+
+// Define the Team schema directly within this file
 const TeamSchema = new mongoose.Schema({
   team_name: String,
-  players: [String]
+  players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }]  // Use ObjectIds referencing Player
 });
 const Team = mongoose.model('Team', TeamSchema);
 
@@ -51,16 +58,17 @@ app.get('/teams', async (req, res) => {
 // Search for teams by player email
 app.get('/teams/player/:email', async (req, res) => {
   try {
-    const player = await Player.findOne({ email: req.params.email });
-    if (!player) {
-      return res.status(404).send('Player not found');
+    // Find teams where the player's email is in the 'players' array
+    const teams = await Team.find({ players: req.params.email });
+    if (teams.length === 0) {
+      return res.status(404).send('No teams found for this player');
     }
-    const teams = await Team.find({ players: player._id });
     res.json(teams);
   } catch (error) {
     res.status(500).send('Error fetching teams');
     console.error(error);
   }
 });
+
 
 app.listen(3002, () => console.log('Team Service running on port 3002'));

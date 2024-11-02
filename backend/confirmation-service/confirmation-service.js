@@ -3,8 +3,9 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 
-const Match = require('./models/Match');
-const Player = require('./models/Player');
+const Player = require('../models/Player');
+const Team = require('../models/Team');
+const Match = require('../models/Match');
 
 const app = express();
 require('dotenv').config();
