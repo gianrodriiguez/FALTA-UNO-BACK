@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const axios = require('axios');  // Add axios for HTTP requests
 const app = express();
 
 // Middleware
@@ -22,22 +23,7 @@ const MatchSchema = new mongoose.Schema({
 
 const Match = mongoose.model('Match', MatchSchema);  // Create the model
 
-// Define the Player schema directly within this file
-const PlayerSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true }
-});
-const Player = mongoose.model('Player', PlayerSchema);
-
-// Define the Team schema directly within this file
-const TeamSchema = new mongoose.Schema({
-  team_name: { type: String, required: true },
-  players: [{ type: String, required: true }]  // Store emails as strings
-});
-
-const Team = mongoose.model('Team', TeamSchema);
-
-// Route to create a match
+// Route to create a match and trigger invite service
 app.post('/create-match', async (req, res) => {
   const { teams, date, time } = req.body;
   
@@ -50,7 +36,18 @@ app.post('/create-match', async (req, res) => {
     // Create and save new match to MongoDB
     const newMatch = new Match({ teams, date, time });
     await newMatch.save();
-    res.status(201).json(newMatch);  // Return the created match
+
+    // // Call invite service after match is created
+    // try {
+    //   await axios.post('http://localhost:3005/send-invite', { match_id: newMatch._id });
+    //   console.log(`Invites sent for match ${newMatch._id}`);
+    // } catch (inviteError) {
+    //   console.error('Error sending invites:', inviteError);
+    //   return res.status(500).json({ error: 'Error creating match and sending invites' });
+    // }
+
+    // Return the created match
+    res.status(201).json(newMatch);
   } catch (error) {
     console.error('Error creating match:', error);
     res.status(500).send('Error creating match');
@@ -60,6 +57,7 @@ app.post('/create-match', async (req, res) => {
 // Fetch matches by team name
 app.get('/matches/team/:teamName', async (req, res) => {
   try {
+    
     const teamName = req.params.teamName;
     const matches = await Match.find({ teams: teamName });
     res.json(matches);

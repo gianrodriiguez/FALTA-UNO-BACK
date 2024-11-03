@@ -20,7 +20,7 @@ const Player = mongoose.model('Player', PlayerSchema);
 
 // Define the Team schema directly within this file
 const TeamSchema = new mongoose.Schema({
-  team_name: { type: String, required: true },
+  team_name: { type: String, required: true , unique: true},
   players: [{ type: String, required: true }]  // Store emails as strings
 });
 
@@ -71,5 +71,20 @@ app.get('/teams/player/:email', async (req, res) => {
   }
 });
 
+// Delete a team by name
+app.delete('/delete-team', async (req, res) => {
+  const { team_name } = req.body;  // Use req.body instead of req.params
+
+  try {
+    const deletedTeam = await Team.findOneAndDelete({ team_name });
+    if (!deletedTeam) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+    res.status(200).json({ message: 'Team deleted successfully', team: deletedTeam });
+  } catch (error) {
+    console.error('Error deleting team:', error);
+    res.status(500).json({ error: 'Error deleting team' });
+  }
+});
 
 app.listen(3002, () => console.log('Team Service running on port 3002'));
