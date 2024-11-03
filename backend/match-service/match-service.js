@@ -22,6 +22,21 @@ const MatchSchema = new mongoose.Schema({
 
 const Match = mongoose.model('Match', MatchSchema);  // Create the model
 
+// Define the Player schema directly within this file
+const PlayerSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true }
+});
+const Player = mongoose.model('Player', PlayerSchema);
+
+// Define the Team schema directly within this file
+const TeamSchema = new mongoose.Schema({
+  team_name: { type: String, required: true },
+  players: [{ type: String, required: true }]  // Store emails as strings
+});
+
+const Team = mongoose.model('Team', TeamSchema);
+
 // Route to create a match
 app.post('/create-match', async (req, res) => {
   const { teams, date, time } = req.body;
@@ -42,23 +57,17 @@ app.post('/create-match', async (req, res) => {
   }
 });
 
-// Route to get matches by team name
-app.get('/matches/team/:team_name', async (req, res) => {
-  const { team_name } = req.params;
-
+// Fetch matches by team name
+app.get('/matches/team/:teamName', async (req, res) => {
   try {
-    // Find matches where the team_name exists in the teams array
-    const matches = await Match.find({ teams: team_name });
-    if (!matches.length) {
-      return res.status(404).send('No matches found for this team');
-    }
-    res.status(200).json(matches);
+    const teamName = req.params.teamName;
+    const matches = await Match.find({ teams: teamName });
+    res.json(matches);
   } catch (error) {
     console.error('Error fetching matches:', error);
     res.status(500).send('Error fetching matches');
   }
 });
-
 
 // Start the server
 app.listen(3003, () => console.log('Match Service running on port 3003'));
