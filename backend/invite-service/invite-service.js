@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const amqp = require('amqplib');
 const app = express();
 require('dotenv').config();
 
@@ -19,59 +20,83 @@ const InviteSchema = new mongoose.Schema({
   status: { type: String, enum: ['sent', 'accepted', 'declined'], default: 'sent' },
   sent_at: { type: Date, default: Date.now }
 });
-
 const Invite = mongoose.model('Invite', InviteSchema);
 
-const PlayerSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true }
-  });
-  
-const Player = mongoose.model('Player', PlayerSchema);
+const Player = mongoose.model('Player', new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true }
+}));
 
-const MatchSchema = new mongoose.Schema({
-    teams: [String],  // Expecting an array of team names or IDs
-    date: String,
-    time: String
-  });
-  
-  const Match = mongoose.model('Match', MatchSchema);  // Create the model
+const Match = mongoose.model('Match', new mongoose.Schema({
+  teams: [String],  // Array of team names or IDs
+  date: String,
+  time: String
+}));
 
-// Route to Send Invites for a Match
-app.post('/send-invite', async (req, res) => {
-  const { match_id } = req.body;
+// Connect to RabbitMQ with retry logic
+async function connectToRabbitMQ(retryCount = 5, delay = 5000) {
+  while (retryCount > 0) {
+    try {
+      const connection = await amqp.connect(process.env.RABBITMQ_URL || 'amqp://localhost');
+      const channel = await connection.createChannel();
+      await channel.assertQueue('invitations');
 
-  try {
-    // Find the match
-    const match = await Match.findById(match_id);
-    if (!match) {
-      return res.status(404).json({ error: 'Match not found' });
+      channel.consume('invitations', async (msg) => {
+        const { match_id, teams } = JSON.parse(msg.content.toString());
+        console.log(`Received invite for match ${match_id}`);
+
+        try {
+          // Fetch all players from both teams
+          const teamPlayers = await Player.find({ team_name: { $in: teams } });
+
+          // Create invite entries for each player
+          const invites = teamPlayers.map(player => ({
+            match_id,
+            player_id: player._id,
+            status: 'sent'
+          }));
+
+          await Invite.insertMany(invites);
+          teamPlayers.forEach(player => {
+            console.log(`Sending invite to ${player.email} for match ${match_id}`);
+          });
+
+          channel.ack(msg);  // Acknowledge the message
+        } catch (error) {
+          console.error('Error processing invitation:', error);
+          channel.nack(msg);  // Retry message if processing fails
+        }
+      });
+
+      console.log('Connected to RabbitMQ');
+      return channel;  // Return the channel if connection is successful
+    } catch (error) {
+      console.error('Failed to connect to RabbitMQ, retrying...', error);
+      retryCount--;
+      if (retryCount === 0) {
+        throw new Error('Could not connect to RabbitMQ after multiple attempts');
+      }
+      await new Promise(res => setTimeout(res, delay)); // Wait before retrying
     }
+  }
+}
 
-    // Fetch all players from both teams in the match
-    const teamPlayers = await Player.find({ team_name: { $in: match.teams } });
 
-    // Send invites to all players in the match
-    const invites = teamPlayers.map(player => ({
-      match_id: match._id,
-      player_id: player._id,
-      status: 'sent'
-    }));
-
-    // Save invites to the database
-    await Invite.insertMany(invites);
-
-    // Log each invite to simulate sending an email
-    teamPlayers.forEach(player => {
-      console.log(`Sending invite to ${player.email} for match ${match_id}`);
-    });
-
-    res.status(200).json({ message: 'Invites sent successfully', invites });
+// Route to get invites for a specific player
+app.get('/invites/player/:playerId', async (req, res) => {
+  const { playerId } = req.params;
+  try {
+    const invites = await Invite.find({ player_id: playerId }).populate('match_id');
+    res.status(200).json(invites);
   } catch (error) {
-    console.error('Error sending invites:', error);
-    res.status(500).json({ error: 'Error sending invites' });
+    console.error('Error fetching invites for player:', error);
+    res.status(500).json({ error: 'Error fetching invites' });
   }
 });
+
+
+// Initialize RabbitMQ listener
+connectToRabbitMQ().then(() => console.log('Listening for invitation messages'));
 
 // Start the Invite Service
 app.listen(3005, () => console.log('Invite Service running on port 3005'));

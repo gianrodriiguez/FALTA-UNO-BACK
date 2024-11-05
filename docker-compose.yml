@@ -1,6 +1,7 @@
 version: '3'
 
 services:
+
   frontend:
     build: ../FALTA-UNO-FRONT
     ports:
@@ -30,14 +31,47 @@ services:
     depends_on:
       - mongo
 
+  rabbitmq:
+      image: rabbitmq:3-management
+      ports:
+        - "5672:5672" # Default port for RabbitMQ
+        - "15672:15672" # Management interface
+      environment:
+        RABBITMQ_DEFAULT_USER: guest
+        RABBITMQ_DEFAULT_PASS: guest
+
   match-service:
     build: ./backend/match-service
     ports:
       - "3003:3003"
     environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
       - MONGO_URI=mongodb://mongo:27017/faltaUnoDB
     depends_on:
+      - rabbitmq
       - mongo
+
+  invite-service:
+    build: ./backend/invite-service
+    depends_on:
+      - rabbitmq
+      - mongo
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - MONGO_URI=mongodb://mongo:27017/faltaUnoDB
+    ports:
+      - "3005:3005"
+
+  confirmation-service:
+    build: ./backend/confirmation-service
+    depends_on:
+      - rabbitmq
+      - mongo
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - MONGO_URI=mongodb://mongo:27017/faltaUnoDB
+    ports:
+      - "3004:3004"
 
   mongo:
     image: mongo:latest

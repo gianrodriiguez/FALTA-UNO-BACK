@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
 
 # Expose the port that the service will run on
-EXPOSE 3004
+EXPOSE 3005
 
 # Command to run the service
 CMD ["node", "invite-service.js"]
