@@ -16,9 +16,10 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
 
 // Define Match schema and model
 const MatchSchema = new mongoose.Schema({
-  teams: [String],  // Expecting an array of team names
+  teams: [String],  // Array of team names
   date: String,
-  time: String
+  time: String,
+  confirmed_players: { type: [mongoose.Schema.Types.ObjectId], ref: 'Player', default: [] }  // Track confirmed players
 });
 
 const Match = mongoose.model('Match', MatchSchema);
@@ -39,7 +40,6 @@ async function connectToRabbitMQ(retryCount = 5, delay = 5000) {
   }
   throw new Error('Could not connect to RabbitMQ after multiple attempts');
 }
-
 
 // Route to create a match and send an invitation message to RabbitMQ
 app.post('/create-match', async (req, res) => {
@@ -82,6 +82,24 @@ app.get('/matches/team/:teamName', async (req, res) => {
   } catch (error) {
     console.error('Error fetching matches:', error);
     res.status(500).send('Error fetching matches');
+  }
+});
+
+// Fetch the number of confirmed players for a specific match
+app.get('/confirmations/:matchId', async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const match = await Match.findById(matchId).populate('confirmed_players');
+
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+
+    const confirmedCount = match.confirmed_players.length;
+    res.json({ confirmedCount, totalPlayers: 2 });  // Assuming a match always has two teams
+  } catch (error) {
+    console.error('Error fetching confirmed players:', error);
+    res.status(500).send('Error fetching confirmed players');
   }
 });
 
